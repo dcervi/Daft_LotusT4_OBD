@@ -133,20 +133,24 @@ public class DaftOBDFileHandlers {
 	public void update_settings_logSaveLocation(File filename, String newLineText)
 	{
 		/*
-		 * this function looks for the line label: "Definition File: " and replaces the
-		 * line with the text: "Definition File: " and newLineText
+		 * this function looks for the line label: "Log save location: " and replaces the
+		 * line with the text: "Log save location: " and newLineText
 		 */
 		replace_or_append_line_in_text_file(filename, "Log save location: ", newLineText);
 	}
 	
-	public File find_defn_fileLocation(File filename, String lineLabel)
+	public void update_settings_logParameters(File filename, String newLineText)
 	{
 		/*
-		 * this function reads through the 'filename' file to find the line label
-		 * and returns the file generated based on that text
+		 * this function looks for the line label: "PIDs active bitmask: " and replaces the
+		 * line with the text: "PIDs active bitmask: " and newLineText
 		 */
-		
-		File returnFile = null;
+		replace_or_append_line_in_text_file(filename, "PIDs active bitmask: ", newLineText);
+	}
+	
+	public String find_data_after_label_in_file(File filename, String lineLabel) {
+		//search through the input file and return the string after the lineLabel
+		String string_after_label = "";
 		
 		if(filename.exists()) 
 		{
@@ -162,8 +166,7 @@ public class DaftOBDFileHandlers {
 					{
 						//we've found the line we want, so let's collect the
 						//string that shows the file path
-						String fileName = fileLine.substring(lineLabel.length());
-						returnFile = new File(fileName);
+						string_after_label = fileLine.substring(lineLabel.length());
 						break;
 					}
 				}
@@ -176,9 +179,40 @@ public class DaftOBDFileHandlers {
 				e.printStackTrace();
 			}
 		}
+		return string_after_label;
+	}
+	
+	public File find_defn_fileLocation(File filename, String lineLabel)
+	{
+		/*
+		 * this function reads through the 'filename' file to find the line label
+		 * and returns the file generated based on that text
+		 */
+		
+		File returnFile = null;
+		String fileName = find_data_after_label_in_file(filename, lineLabel);
+		if(!fileName.isEmpty()) {
+			returnFile = new File(fileName);
+		}
 		return returnFile;
 	}
 	
+	public boolean[] import_PID_reload_list(File settings_file) {
+		//import the flag that shows the PIDs that were active at last operation
+		boolean[] PIDs_reload = {false};
+		String PIDs_mask_string = find_data_after_label_in_file(settings_file, "PIDs active bitmask: ");
+		if(!PIDs_mask_string.isEmpty())
+		{
+			PIDs_reload = new boolean[PIDs_mask_string.length()];
+			for(int i = 0; i < PIDs_mask_string.length(); i++) {
+				if(PIDs_mask_string.substring(i,i+1).equals("1"))
+				{
+					PIDs_reload[i] = true;
+				}
+			}
+		}
+		return PIDs_reload;
+	}
 	
 	public DaftTreeComponent import_Log_definition_list(File settings_file) {
 		DaftTreeComponent treeDefinitionList = new DaftTreeComponent("Parameters");
@@ -192,10 +226,13 @@ public class DaftOBDFileHandlers {
 		boolean sendFlag = false;
 		boolean onDataList = false;
 		boolean onReflash = false;
+		boolean onRAMwrite = false;
 		
 		String mode = null;
 		String name = null;
 		String initName = null;
+		int messagePeriod = 0;
+		boolean init_needed = false;
 		Serial_Packet send_packet = new Serial_Packet();
 		Serial_Packet[] sendPacketList = new Serial_Packet[0];
 		Serial_Packet read_packet = new Serial_Packet();
@@ -203,6 +240,7 @@ public class DaftOBDFileHandlers {
 		boolean repeatRead = false;//a flag indicating that a receive packet line may represent multiple packets
 		int replicate = 0;//if a packet is repeated, this is the max number of times it will occur
 		boolean read_only_once = false;//a flag associated with a PID indicating that it should only be read once
+		boolean beepOnPoll = false;//a flag associated with a PID that is used to signal the user that the value is being read
 		
 		boolean[] flowControl = new boolean[0];//a vector showing the send/receive order
 		
@@ -281,7 +319,13 @@ public class DaftOBDFileHandlers {
 								if(fileLine.contains("init="))
 								{
 									initName = stringBetween(fileLine, "init=\"","\"");
+									init_needed = true;
 								}
+								else
+								{
+									init_needed = false;
+								}
+								
 								if(fileLine.contains("read_only_once=\"true\""))
 								{
 									read_only_once = true;
@@ -291,9 +335,25 @@ public class DaftOBDFileHandlers {
 									read_only_once = false;
 								}
 								
+								if(fileLine.contains("messagePeriodms="))
+								{
+									String periodString = stringBetween(fileLine, "messagePeriodms=\"","\"");
+									messagePeriod = convert.Hex_or_Dec_string_to_int(periodString); 
+								}
+								
+								if(fileLine.contains("beepOnPoll=\"true\""))
+								{
+									beepOnPoll = true;
+								}
+								else
+								{
+									beepOnPoll = false;
+								}
+
 								sendPacketList = new Serial_Packet[0];//reset the list of send data packets associated with the parameter
 								readPacketList = new Serial_Packet[0];
 								flowControl = new boolean[0];
+
 							}
 							else if(fileLine.contains("</pid>"))
 							{
@@ -308,11 +368,22 @@ public class DaftOBDFileHandlers {
 								//DaftOBDSelectionObject DaftTreeLeaf = new DaftOBDSelectionObject(mode, name, dataToSend, numberInputBoxes);
 								DaftOBDSelectionObject DaftTreeLeaf = new DaftOBDSelectionObject(mode, name, sendPacketList, readPacketList);
 								DaftTreeLeaf.flowControl = flowControl;
-								DaftTreeLeaf.initID = initName;
+								
+								if(init_needed)
+								{
+									DaftTreeLeaf.setInit(initName);
+								}
+								
 								if(read_only_once)
 								{
 									DaftTreeLeaf.setReadOnce(read_only_once);
 								}
+								
+								if(beepOnPoll)
+								{
+									DaftTreeLeaf.setBeepOnPoll(beepOnPoll);
+								}
+								DaftTreeLeaf.setPeriod(messagePeriod);
 								
 								//then add this object to our tree
 								treeDefinitionList.add(DaftTreeLeaf);
@@ -320,6 +391,7 @@ public class DaftOBDFileHandlers {
 								//and clear our PID data buffers
 								mode = null;
 								name = null;
+								messagePeriod = 0;
 
 								//and no longer process our lines to fill the PID data buffers
 								onParameter = false;
@@ -455,6 +527,90 @@ public class DaftOBDFileHandlers {
 							else if(fileLine.contains("</reflash>"))
 							{
 								onReflash = false;
+							}
+							else if(fileLine.contains("<RAMwrite")) {
+								onRAMwrite = true;
+								String data_source = "0x70000";
+								String data_length = "0x6000";
+								String data_destin = "0x84000";
+								String bitRate = "10400";
+								
+								
+								//then read in the parts of this line that define the PID
+								if(fileLine.contains("name="))
+								{
+									name = stringBetween(fileLine, "name=\"","\"");
+								}
+								if(fileLine.contains("mode="))
+								{
+									mode = stringBetween(fileLine, "mode=\"","\"");
+								}
+								if(fileLine.contains("init="))
+								{
+									initName = stringBetween(fileLine, "init=\"","\"");
+									init_needed = true;
+								}
+								else
+								{
+									init_needed = false;
+								}
+								
+								if(fileLine.contains("read_only_once=\"true\""))
+								{
+									read_only_once = true;
+								}
+								else
+								{
+									read_only_once = false;
+								}
+								
+								if(fileLine.contains("targetAddressROM="))
+								{
+									data_source = stringBetween(fileLine,"targetAddressROM=\"","\"");
+								}
+								if(fileLine.contains("targetLength="))
+								{
+									data_length = stringBetween(fileLine,"targetLength=\"","\"");
+								}
+								if(fileLine.contains("targetAddressRAM="))
+								{
+									data_destin = stringBetween(fileLine,"targetAddressRAM=\"","\"");
+								}
+								if(fileLine.contains("baud="))
+								{
+									bitRate = stringBetween(fileLine,"baud=\"","\"");
+								}
+								
+								
+								//create the RAM write object- this will ultimately auto-generate
+								//the send, receive and flow control variables
+								DaftOBDSelectionObject DaftTreeLeaf_RAM_write = new DaftOBDSelectionObject(mode, name, 1, data_destin, data_source, data_length, bitRate);								
+								
+								if(init_needed)
+								{
+									DaftTreeLeaf_RAM_write.setInit(initName);
+								}
+								
+								if(read_only_once)
+								{
+									DaftTreeLeaf_RAM_write.setReadOnce(read_only_once);
+								}
+								
+								//then add this object to our tree
+								treeDefinitionList.add(DaftTreeLeaf_RAM_write);
+								
+								//and clear our PID data buffers
+								mode = null;
+								name = null;
+								
+								//then if we're done, remove the flag setting
+								if(fileLine.contains("/>"))
+								{
+									onRAMwrite = false;
+								}
+							}
+							else if(fileLine.contains("/RAMwrite>")) {
+								onRAMwrite = false;
 							}
 
 							//if we're on a parameter, we should process the string to find the
@@ -825,11 +981,11 @@ public class DaftOBDFileHandlers {
 	}
 	
 	
-	public void appendln_byteLogFile(File settings_file, String lineToAppend)
+	public void appendln_byteLogFile(File settings_file, String filename_append, String lineToAppend)
 	{
 		//first, find the location that we should save the log file to
 		File logSaveLocation = find_defn_fileLocation(settings_file, "Log save location: ");
-		String byteLogFileName = logSaveLocation.getPath() + "\\Daft OBD byte log.txt";
+		String byteLogFileName = logSaveLocation.getPath() + "\\Daft OBD byte log " + filename_append + ".txt";
 		File byteLogFile = new File(byteLogFileName);
 		
 		//if the file does not exist, try creating it
@@ -862,11 +1018,11 @@ public class DaftOBDFileHandlers {
 		}
 	}
 	
-	public void appendln_dataLogFile(File settings_file, String lineToAppend)
+	public void appendln_dataLogFile(File settings_file, String filename_append, String lineToAppend)
 	{
 		//first, find the location that we should save the log file to
 		File logSaveLocation = find_defn_fileLocation(settings_file, "Log save location: ");
-		String dataLogFileName = logSaveLocation.getPath() + "\\Daft OBD data log.txt";
+		String dataLogFileName = logSaveLocation.getPath() + "\\Daft OBD data log " + filename_append + ".txt";
 		File dataLogFile = new File(dataLogFileName);
 		
 		//if the file does not exist, try creating it
@@ -899,14 +1055,14 @@ public class DaftOBDFileHandlers {
 		}
 	}
 	
-	public void appendStrArray_byteLogFile(File settings_file, String[] byteSetString)
+	public void appendStrArray_byteLogFile(File settings_file, String filename_append, String[] byteSetString)
 	{
 		//this function loops through all of the strings in 'byteSetString' and
 		//appends them line-by-line to the byte log file
 
 		//first, find the location that we should save the log file to
 		File logSaveLocation = find_defn_fileLocation(settings_file, "Log save location: ");
-		String byteLogFileName = logSaveLocation.getPath() + "\\Daft OBD byte log.txt";
+		String byteLogFileName = logSaveLocation.getPath() + "\\Daft OBD byte log " + filename_append + ".txt";
 		File byteLogFile = new File(byteLogFileName);
 
 		//if the file does not exist, try creating it
@@ -930,7 +1086,7 @@ public class DaftOBDFileHandlers {
 				writer = new BufferedWriter(new FileWriter(byteLogFile,true));//set to append
 				
 				for(int i = 0; i < byteSetString.length; i++)
-				{
+				{ 
 					writer.append(byteSetString[i]);
 					writer.newLine();
 				}
@@ -944,14 +1100,14 @@ public class DaftOBDFileHandlers {
 		}
 	}
 	
-	public void appendStrArray_dataLogFile(File settings_file, String[] dataSetString)
+	public void appendStrArray_dataLogFile(File settings_file, String filename_append, String[] dataSetString)
 	{
 		//this function loops through all strings in 'dataSetString' and
 		//appends them line-by-line to the data log file
 		
 		//first, find the location that we should save the log file to
 		File logSaveLocation = find_defn_fileLocation(settings_file, "Log save location: ");
-		String dataLogFileName = logSaveLocation.getPath() + "\\Daft OBD data log.txt";
+		String dataLogFileName = logSaveLocation.getPath() + "\\Daft OBD data log " + filename_append + ".txt";
 		File dataLogFile = new File(dataLogFileName);
 
 		//if the file does not exist, try creating it

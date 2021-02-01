@@ -121,6 +121,7 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 	int reflash_msg_index = 0;//an index that allows us to keep track of where we are in the reflashing process
 	
 	Conversion_Handler convert = new Conversion_Handler();//allow us to convert between different number types
+	ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(0);//to allow time-scheduled tasks
 	
 	
 	DaftReflashSelectionObject(String nameString) {
@@ -401,16 +402,23 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 			resetEncodingFlags();
 			
 			//then schedule further action
-			ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-			scheduler.schedule(this, 100, TimeUnit.MICROSECONDS);
-			scheduler.shutdown();//make sure to tell the executor to shut down the thread when finished!
-
+			//ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+			//scheduler.schedule(this, 100, TimeUnit.MICROSECONDS);
+			//scheduler.shutdown();//make sure to tell the executor to shut down the thread when finished!
+			this.scheduler.schedule(this, 100, TimeUnit.MICROSECONDS);
+			
 		}
 		else
 		{
 			//stop
 			this.running = false;
 			this.active = false;
+			
+			//then schedule one further action
+			//ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+			//scheduler.schedule(this, 100, TimeUnit.MICROSECONDS);
+			//scheduler.shutdown();//make sure to tell the executor to shut down the thread when finished!
+			this.scheduler.schedule(this, 100, TimeUnit.MICROSECONDS);
 			
 			this.statusText.setText("Inactive");
 			this.statusText.repaint();
@@ -1304,7 +1312,7 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 				writer = new BufferedWriter(new FileWriter(saveDecodeFile));
 				writer.close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
+				//Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -1566,11 +1574,11 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 							writer.newLine();
 						}
 						
-						String data = convert.Int_to_hex_string(subPacket[i]);
-						if(data.length() < 2)
+						String data = convert.Int_to_hex_string(subPacket[i],2);
+						/*if(data.length() < 2)
 						{
 							data = "0".concat(data);
-						}
+						}*/
 						writer.append(data);
 						
 					}
@@ -1598,7 +1606,6 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 				
 				writer.close();//close the file
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -1828,7 +1835,6 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 				writer = new BufferedWriter(new FileWriter(saveDecodeFile));
 				writer.close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -1885,11 +1891,12 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 								else if(i > 12)
 								{
 									//we're on data! -> convert to Hex byte, print and change line every 16 bytes
-									String hexData = convert.Int_to_hex_string((int) thisPacket[i] & 0xFF);
+									String hexData = convert.Int_to_hex_string((int) thisPacket[i] & 0xFF,2);
+									/*
 									if(hexData.length() < 2)
 									{
 										hexData = "0".concat(hexData);
-									}
+									}*/
 									writer.append(hexData);
 
 									if( (i - 12) % 16 == 0)
@@ -1958,7 +1965,6 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 				writer.newLine();
 				writer.close();//close the file
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 
@@ -2175,7 +2181,6 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 		try {
 			saveReflashFile.createNewFile();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
@@ -2205,7 +2210,6 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 				}
 				writer.close();//close the file
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -2235,7 +2239,6 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 				saveSRECFile.createNewFile();
 			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -2247,10 +2250,8 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 			binFile.write(hexData);
 			binFile.close();
 		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -2281,7 +2282,6 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 						writer.newLine();
 						writer.close();//close the file
 					} catch (IOException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 				}
@@ -2296,7 +2296,6 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 						writer.newLine();
 						writer.close();//close the file
 					} catch (IOException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 				}
@@ -2313,26 +2312,26 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 		int addrMH = (int) ((addr >> 16) & 0xFF);
 		int addrML = (int) ((addr >> 8) & 0xFF);
 		int addrL = (int) ((addr) & 0xFF);
-		String addrH_str = convert.Int_to_hex_string(addrH);
-		if(addrH_str.length() < 2)
+		String addrH_str = convert.Int_to_hex_string(addrH,2);
+		/*if(addrH_str.length() < 2)
 		{
 			addrH_str = "0".concat(addrH_str);
-		}
-		String addrMH_str = convert.Int_to_hex_string(addrMH);
-		if(addrMH_str.length() < 2)
+		}*/
+		String addrMH_str = convert.Int_to_hex_string(addrMH,2);
+		/*if(addrMH_str.length() < 2)
 		{
 			addrMH_str = "0".concat(addrMH_str);
-		}
-		String addrML_str = convert.Int_to_hex_string(addrML);
-		if(addrML_str.length() < 2)
+		}*/
+		String addrML_str = convert.Int_to_hex_string(addrML,2);
+		/*if(addrML_str.length() < 2)
 		{
 			addrML_str = "0".concat(addrML_str);
-		}
-		String addrL_str = convert.Int_to_hex_string(addrL);
-		if(addrL_str.length() < 2)
+		}*/
+		String addrL_str = convert.Int_to_hex_string(addrL,2);
+		/*if(addrL_str.length() < 2)
 		{
 			addrL_str = "0".concat(addrL_str);
-		}
+		}*/
 		
 		//create the byte count: we'll make 'S3' records
 		int dataLen = hexData.length;
@@ -2341,11 +2340,11 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 			dataLen = 16;
 		}
 		int count = 4 + dataLen + 1;
-		String count_str = convert.Int_to_hex_string(count);
-		if(count_str.length() < 2)
+		String count_str = convert.Int_to_hex_string(count,2);
+		/*if(count_str.length() < 2)
 		{
 			count_str = "0".concat(count_str);
-		}
+		}*/
 		
 		//then work to sum up the data
 		int sum = 0;
@@ -2363,21 +2362,21 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 		{
 			int thisByte = ((int) hexData[i]) & 0xFF;
 			sum = (sum + thisByte) & 0xFF;
-			String byte_str = convert.Int_to_hex_string(thisByte);
-			if(byte_str.length() < 2)
+			String byte_str = convert.Int_to_hex_string(thisByte,2);
+			/*if(byte_str.length() < 2)
 			{
 				byte_str = "0".concat(byte_str);
-			}
+			}*/
 			line = line.concat(byte_str);
 		}
 		
 		//invert the sum, then put it on the line
 		sum = (~sum) & 0xFF;
-		String sum_str = convert.Int_to_hex_string(sum);
-		if(sum_str.length() < 2)
+		String sum_str = convert.Int_to_hex_string(sum,2);
+		/*if(sum_str.length() < 2)
 		{
 			sum_str = "0".concat(sum_str);
-		}
+		}*/
 		line = line.concat(sum_str);
 		return line;
 	}
@@ -2401,20 +2400,36 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 		//then read back the ECU response saying it is ready for the next packet, or if there was an error
 		byte[] ECU_readiness = this.ComPort.read(4);
 		
-		//save the data in our byte log string
-		String readData = "Read: [ ";
-		for(int i = 0; i < ECU_readiness.length; i++)
-		{
-			readData = readData.concat(this.convert.Int_to_dec_string((int) ECU_readiness[i] & 0xFF)).concat(" ");
-		}
-		readData = readData.concat("]");
-		
-		this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
-		this.string_comm_log[this.string_comm_log.length - 1] = readData;
+		//check to see that what we read is what we expect, too	
 		
 		//then act depending on the ECU response
 		if(ECU_readiness.length == 4)
 		{
+			//make an effort to deal with dropped packets
+			if((int) (ECU_readiness[0] & 0xFF) != 2 || (int) (ECU_readiness[1] &0xFF) != 0x72)
+			{
+				//we should read in another byte, assuming that we missed the check byte earlier
+				//and read it in with the current four bytes
+				byte[] missed = this.ComPort.read(1);
+				
+				String readData = "Read: [ ";
+				if(missed.length > 0)
+				{
+					//save the check byte data in our byte log string
+					readData = readData.concat(this.convert.Int_to_hex_string((int) ECU_readiness[0] & 0xFF,2)).concat(" ");
+					
+					//and shift the data that is in the readiness byte packet so we can treat it as normal
+					ECU_readiness[0] = ECU_readiness[1];
+					ECU_readiness[1] = ECU_readiness[2];
+					ECU_readiness[2] = ECU_readiness[3];
+					ECU_readiness[3] = missed[0];
+				}
+				readData = readData.concat("]");
+
+				this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
+				this.string_comm_log[this.string_comm_log.length - 1] = readData;
+			}
+			
 			if((int) (ECU_readiness[2] & 0xFF) == 0)
 			{
 				//2 114 0 116 - message received successfully - continue on
@@ -2431,6 +2446,17 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 				this.ComPort.send(invert);
 			}
 		}
+		
+		//save the data in our byte log string
+		String readData = "Read: [ ";
+		for(int i = 0; i < ECU_readiness.length; i++)
+		{
+			readData = readData.concat(this.convert.Int_to_hex_string((int) ECU_readiness[i] & 0xFF, 2)).concat(" ");
+		}
+		readData = readData.concat("]");
+
+		this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
+		this.string_comm_log[this.string_comm_log.length - 1] = readData;
 		
 		return success;
 	}
@@ -2806,7 +2832,6 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 				try {
 					this.hexData = Files.readAllBytes(hexPath);//then read in all bytes of data from the hex file
 				} catch (IOException e1) {
-					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
 				System.out.println("Done reading hex file. Length: " + this.hexData.length + " bytes");
@@ -2905,9 +2930,10 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 				//System.out.println("Begin encoding");
 				this.running = true;
 				//schedule the runnable function to begin encoding bytes
-	    		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-	    		scheduler.schedule(this, 10, TimeUnit.MILLISECONDS);
-	    		scheduler.shutdown();//make sure to tell the executor to shut down the thread when finished!
+	    		//ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+	    		//scheduler.schedule(this, 10, TimeUnit.MILLISECONDS);
+	    		//scheduler.shutdown();//make sure to tell the executor to shut down the thread when finished!
+				this.scheduler.schedule(this, 10, TimeUnit.MILLISECONDS);
 			}
 			else
 			{
@@ -2938,9 +2964,10 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 					//System.out.println("Begin decoding");
 					this.running = true;
 					//schedule the runnable function to begin encoding bytes
-					ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-					scheduler.schedule(this, 10, TimeUnit.MILLISECONDS);
-					scheduler.shutdown();//make sure to tell the executor to shut down the thread when finished!
+					//ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+					//scheduler.schedule(this, 10, TimeUnit.MILLISECONDS);
+					//scheduler.shutdown();//make sure to tell the executor to shut down the thread when finished!
+					this.scheduler.schedule(this, 10, TimeUnit.MILLISECONDS);
 				}
 				else
 				{
@@ -3043,7 +3070,8 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 					if(!this.stageI)
 					{
 						//stage II bootloader interaction
-
+						
+						//initiate connection to ECU
 						if(this.begin_connect_to_ECU)
 						{
 
@@ -3064,15 +3092,16 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 									this.string_comm_log[this.string_comm_log.length - 1] = "Generic reflash bootloader session";
 									
 									this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
-									this.string_comm_log[this.string_comm_log.length - 1] = "Send: [ 1 113 114 ]";
+									this.string_comm_log[this.string_comm_log.length - 1] = "Send: [ 01 71 72 ]";//"Send: [ 1 113 114 ]";
 										
 									this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
-									this.string_comm_log[this.string_comm_log.length - 1] = "Read: [ 141 ]";
+									this.string_comm_log[this.string_comm_log.length - 1] = "Read: [ 8D ]";//"Read: [ 141 ]";
 											
 									this.begin_connect_to_ECU = false;//we're connected so we don't need to keep looping through
 
-									//then change the Comport timeouts back to normal
-									this.ComPort.changeRx_timeout(500);
+									//then change the Comport timeouts to be long so we can accommodate the 
+									//flash erase timescale
+									this.ComPort.changeRx_timeout(4000);
 
 									this.statusText.setText("Connected to ECU");
 									this.statusText.repaint();
@@ -3104,7 +3133,7 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 								String sentData = "Send: [ ";
 								for(int i = 0; i < msg.length; i++)
 								{
-									sentData = sentData.concat(this.convert.Int_to_dec_string((int) msg[i] & 0xFF)).concat(" ");
+									sentData = sentData.concat(this.convert.Int_to_hex_string((int) msg[i] & 0xFF, 2)).concat(" ");
 								}
 								sentData = sentData.concat("]");
 								
@@ -3113,32 +3142,41 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 
 								//then read back the ECU acknowledgement of packet reception: the inverted checksum byte
 								byte[] check_response = this.ComPort.read(1);
-								String readData = "Read: [ ".concat(this.convert.Int_to_dec_string( (int) check_response[0] & 0xFF) ).concat(" ]");
+								String readData = "Read: [ ";
+								if(check_response.length > 0)
+								{
+									readData = readData.concat(this.convert.Int_to_hex_string( (int) check_response[0] & 0xFF, 2) ).concat(" ");
+								}
+								readData = readData.concat("]");
+								
 								this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
 								this.string_comm_log[this.string_comm_log.length - 1] = readData;
+								
 
 								if(this.specialRead && this.reflash_msg_index > 0)
 								{
 									//read back the ECU's response to our special query for a ROM read
+									//this is not robust to missing the ECU's ack byte above
+									
 									byte[] read_ROM = ComPort.read((int) (msg[6] & 0xFF) + 3);//read back the number of bytes we requested and the header, checksum and packet length
 
 									readData = "Read: [ ";
 									for(int i = 0; i < read_ROM.length; i++)
 									{
-										readData = readData.concat(this.convert.Int_to_dec_string((int) read_ROM[i] & 0xFF)).concat(" ");
+										readData = readData.concat(this.convert.Int_to_hex_string((int) read_ROM[i] & 0xFF, 2)).concat(" ");
 									}
 									readData = readData.concat("]");
-									
+
 									this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
 									this.string_comm_log[this.string_comm_log.length - 1] = readData;
-									
+
 									//then respond with the inverted checksum byte
 									byte[] invert = {(byte) ~read_ROM[read_ROM.length -1]};
 									this.ComPort.send(invert);
-									sentData = "Send: [ ".concat(this.convert.Int_to_dec_string( (int) invert[0] & 0xFF) ).concat(" ]");
+									sentData = "Send: [ ".concat(this.convert.Int_to_hex_string( (int) invert[0] & 0xFF,2) ).concat(" ]");
 									this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
 									this.string_comm_log[this.string_comm_log.length - 1] = sentData;
-									
+
 									//then save the data into our repository of read data for saving
 									if(read_ROM.length > 2)
 									{
@@ -3158,7 +3196,13 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 								{
 									//then read back the ECU response saying it is ready for the next packet, or if there was an error
 									this.reflash_msg_index += 1;
+									if(this.reflash_msg_index == 1)
+									{
+										this.ComPort.changeRx_timeout(1000);//shorten the timeout so that we can recover from dropped packets by resending 
+									}
+
 								}
+
 
 								keepRunning = true;
 
@@ -3181,14 +3225,20 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 								//send the end session message 1 115 116
 								byte[] end_bootloader_session = {1, 115, 116};
 								this.ComPort.send(end_bootloader_session);
-								String finalSend = "Send: [ 1 115 116 ]";
+								String finalSend = "Send: [ 01 73 74 ]";//"Send: [ 1 115 116 ]";
 								this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
 								this.string_comm_log[this.string_comm_log.length - 1] = finalSend;
 
 								//and read back the ECU's ack
 								byte[] check_response = new byte[1];
 								check_response = this.ComPort.read(1);
-								String readData = "Read: [ ".concat(this.convert.Int_to_dec_string( (int) check_response[0] & 0xFF) ).concat(" ]");
+								String readData = "Read: [ ";
+								if(check_response.length > 0)
+								{
+									readData = readData.concat(this.convert.Int_to_hex_string( (int) check_response[0] & 0xFF, 2) ).concat(" ");
+								}
+								readData = readData.concat("]");
+								
 								this.string_comm_log = Arrays.copyOf(this.string_comm_log, this.string_comm_log.length + 1);
 								this.string_comm_log[this.string_comm_log.length - 1] = readData;
 
@@ -3488,9 +3538,10 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 		{
 			//System.out.println("Schedule next event");
 			//schedule another runnable call
-			ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    		scheduler.schedule(this, 100, TimeUnit.MICROSECONDS);
-    		scheduler.shutdown();//make sure to tell the executor to shut down the thread when finished!
+			//ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    		//scheduler.schedule(this, 100, TimeUnit.MICROSECONDS);
+    		//scheduler.shutdown();//make sure to tell the executor to shut down the thread when finished!
+			this.scheduler.schedule(this, 100, TimeUnit.MICROSECONDS);
 		}
 		else
 		{
@@ -3503,7 +3554,7 @@ public class DaftReflashSelectionObject implements ActionListener, FocusListener
 			if(this.string_comm_log.length > 0)
 			{
 				DaftOBDFileHandlers handler = new DaftOBDFileHandlers();
-				handler.appendStrArray_byteLogFile(this.settings_file, this.string_comm_log);
+				handler.appendStrArray_byteLogFile(this.settings_file, "", this.string_comm_log);
 			}
 		}
 		

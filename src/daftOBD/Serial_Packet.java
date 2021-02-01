@@ -107,19 +107,18 @@ public class Serial_Packet {
 		//calculate the checksum for the packet
 		//assume that the sum is for all bytes except the last one
 		int sum = 0;
-		for(int i = 0; i < data.length - 1; i++)
-		{
-			//be mindful of Java's lack of unsigned integers
-			sum = (sum + convertToInt(data[i])) % 256;
+		for(int i = 0; i < data.length - 1; i++) {
+			sum += (int) data[i];
 		}
+		sum = sum & 0xFF;
 		return sum;
 	}
 	
 	private byte convertFromInt(int data) {
 		//convert an integer input to a byte
 		byte output = 0;
-		data = data % 256;//use only the lowest order byte
-		if(data >= 0 && data <= 255)
+		data = data % 256;//The integer could be up to 64 bits: use only the lowest order byte
+		if(data >= 0 && data <= 255)//this is some goofy number handling... i've lost the implication of this by now 
 		{
 			if(data > 127)
 			{
@@ -130,12 +129,15 @@ public class Serial_Packet {
 				output = (byte) data;
 			}
 		}
+		else if(data < 0 && data >= -128){
+			output = (byte) (data & 0xFF);//maybe we were handed data that already fit the 'byte' type behavior.. this line may actually be all that is needed in this function..
+		}
 		return output;
 	}
 	
 	private int convertToInt(byte data) {
 		//convert byte data to an integer
-		int output = data & 0xFF;
+		int output = data & 0xFF;//the ff mask may not be necessary.
 		return output;
 	}
 	
@@ -203,9 +205,15 @@ public class Serial_Packet {
 			if(byteIndex < this.packetData.length)
 			{
 				byte pcktByte = this.packetData[byteIndex];
+				//System.out.println("Get byte: " + pcktByte + ", from index: " + byteIndex);
 				collectedFromPacket = collectedFromPacket << 8;
-				collectedFromPacket = collectedFromPacket | (int) pcktByte;
+				collectedFromPacket = collectedFromPacket | (((int) pcktByte) & 0xFF);
 				bitsCollectedFromPacket += 8;
+				byteIndex += 1;
+			}
+			else
+			{
+				break;
 			}
 		}
 		
@@ -250,12 +258,12 @@ public class Serial_Packet {
 		//in order to get the data, we need to first align the bits on a byte edge
 		//before shifting them to the bit start position within the byte where we're
 		//placing it -> assume that input data is aligned to bit0 instead of the packet
-		//position
-		int bitShiftToByteAlign = bitLength % 8;
-		int firstSplit = data << (8 - bitShiftToByteAlign);
+		//position, big endian
+		int bitShiftToByteAlign = bitLength % 8;//the number of non-byte even bits
+		int firstSplit = data << (8 - bitShiftToByteAlign);//shift so that the new data is byte aligned
 		while(firstSplit > 255)
 		{
-			firstSplit = firstSplit >> 8;
+			firstSplit = firstSplit >> 8;//then collect only the highest order byte
 		}
 		firstSplit = (firstSplit >> bitsIndex) & 0xFF;//take only the top (8 - bitsIndex) bits
 		int firstSplitBitLength = bitLength;
@@ -278,17 +286,17 @@ public class Serial_Packet {
 		/*
 		System.out.println("Packet Bitlen: " + this.packetBitLength);
 		System.out.println("Insert BitPos: " + bitPosition);
-		System.out.println("Insert Bitoffset: " + (8 - bitsIndex) + " insert bitlen: " + firstSplitBitLength);
+		System.out.println("new data Bitoffset: " + (8 - bitsIndex) + " and bitlen: " + firstSplitBitLength);
 		System.out.println("Packet length: " + this.packetLength);
-		System.out.println("Insert Packet: " + byteIndex);
-		System.out.println("Second bitLen: " + secondSplitBitLength);
+		System.out.println("Insert pos in Packet: " + byteIndex);
+		System.out.println("extra data bitLen: " + secondSplitBitLength);
 		System.out.println(" ");
 		*/
 		
 		//now change data in the packet, or append if necessary
 		if(this.packetLength*8 > bitPosition)
 		{
-			//we are changing data within the packet
+			//we are changing data within the packet, rather than appending
 			//collect data from the packet
 			int thirdMask = 0;
 			for(int i = 0; i < 8; i++)
@@ -300,7 +308,15 @@ public class Serial_Packet {
 			}
 			byte byteFromPacket = (byte) (this.packetData[byteIndex] & thirdMask);
 			this.packetData[byteIndex] = (byte) (byteFromPacket | firstSplit);
-			this.packetBitLength += firstSplitBitLength;
+			
+			//if we're in a byte that is added to the packet, but the data is new, be sure
+			//to update the packet bit length
+			if(this.packetBitLength < bitPosition + firstSplitBitLength)
+			{
+				this.packetBitLength += firstSplitBitLength;
+			}
+			//System.out.print("changing data: ");
+			//System.out.println(this.packetData[byteIndex]);
 		}
 		else
 		{
@@ -312,7 +328,10 @@ public class Serial_Packet {
 			this.packetData[this.packetData.length - 1] = (byte) firstSplit;
 			this.packetLength += 1;
 			this.packetBitLength += firstSplitBitLength;
+			//System.out.print("appending data: ");
+			//System.out.println((byte) firstSplit);
 		}
+		
 		
 		//then recursively add the remaining bytes
 		if(secondSplitBitLength > 0)
@@ -339,8 +358,10 @@ public class Serial_Packet {
 	public String getOutputNameList() {
 		//this function returns the names of all 'outputs' from this Serial_Packet
 		String names = "";
+		//System.out.print("Check to see if the outputs in this packet should be read...");
 		if(shouldBeRead())
 		{
+			//System.out.println("Collect the names of " + this.outputList.length + " outputs");
 			for(int i = 0; i < this.outputList.length; i++)
 			{
 				if(!this.outputList[i].child_to_other_output)
@@ -348,6 +369,10 @@ public class Serial_Packet {
 					names = names.concat(this.outputList[i].name).concat(",");
 				}
 			}
+		}
+		else
+		{
+			//System.out.println("nope");
 		}
 		return names;
 	}
@@ -392,6 +417,15 @@ public class Serial_Packet {
 		updateChecksum();
 	}
 	
+	public void print_packet() {
+		Conversion_Handler convert = new Conversion_Handler();
+		for(int i = 0; i < this.packetLength; i++)
+		{
+			System.out.print(convert.Int_to_hex_string(this.packetData[i],2)+" ");
+		}
+		System.out.println();
+	}
+	
 	//special functions for conditional read serial packets
 	public void setExpression(String expr) {
 		//this function updates the expression used to decide if the packet should be read
@@ -432,11 +466,13 @@ public class Serial_Packet {
 				}
 				substitutedExpression = parser.replace_variable_String_with_value(varValue, varName, substitutedExpression);
 			}
+			//System.out.println("Uses an expression of length: " + this.expression.length() + " which is: " + substitutedExpression);
 		}
 		
 		//System.out.println("Compare: " + substitutedExpression + " and " + this.condition);
 		
 		//first, we should check for the type of condition
+		//System.out.println("Compare the conditional reporting string: " + this.condition);
 		Conversion_Handler convert = new Conversion_Handler();
 		if(this.condition.contains("<"))
 		{
@@ -468,6 +504,7 @@ public class Serial_Packet {
 		else if(this.condition.contains(">"))
 		{
 			String filteredCondition = convert.stringAfter(this.condition,">");
+			//System.out.println("Try to parse the condition, remove the '>': " + filteredCondition);
 			boolean equals = false;
 			if(filteredCondition.contains("="))
 			{

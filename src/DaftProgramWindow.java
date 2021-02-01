@@ -1,3 +1,4 @@
+import java.awt.Dimension;
 import java.io.File;
 import java.io.IOException;
 
@@ -10,8 +11,8 @@ public class DaftProgramWindow {
 	
 	public static void createAndShowGUI() {
 		//a frame to put our user interface into
-		JFrame main_window = new JFrame("Daft OBD v2.04");
-		main_window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);//set what the window does when closed
+		JFrame main_window = new JFrame("Daft OBD v2.15");
+		//main_window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);//set what the window does when closed
 		
 		//load or create our settings file
 		File settings_file = new File("Daft OBD settings.txt");
@@ -32,9 +33,20 @@ public class DaftProgramWindow {
 		main_window.add(windowContent.loggingParameterSelectors());
 		
 		main_window.setResizable(true);//allow the window to be resized
+		main_window.setMinimumSize(new Dimension(320,240));
+		main_window.setPreferredSize(new Dimension(800,600));
 		//draw the window to size
 		main_window.pack();
 		main_window.setVisible(true);//and then set it to visible
+		
+		//we would like to save the state of selected PIDs, so listen for the window close event
+		main_window.addWindowListener(new java.awt.event.WindowAdapter() {
+			@Override
+			public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+				windowContent.save_PID_select_state();
+				System.exit(0);
+			}
+		});
 		
 	}
 	
@@ -74,6 +86,7 @@ public class DaftProgramWindow {
         
 		//use system out calls to print diagnostic information
 		System.out.println("Welcome to Daft OBD");
+		
 		
 
 	}
